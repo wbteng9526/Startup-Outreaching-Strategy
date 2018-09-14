@@ -1,3 +1,8 @@
+#############################################################################################################
+#############################################################################################################
+############################ Startup Outreaching Strategies #################################################
+
+# Upload Relevant Packages
 library(epiDisplay)
 library(interplot)
 library(ggplot2)
@@ -6,9 +11,12 @@ library(XLConnect)
 library(broom)
 library(caret)
 library(ResourceSelection)
+
+# Upload Datasets
 fin_win <- read.csv(file.choose(),stringsAsFactors = F)
 attach(fin_win)
 
+# Calculate the number of month after the company was founded
 datedff <- NULL
 for (i in 1:length(Founding.Date)) {
   yeardff <- (Class.Year[i]-(as.numeric(substr(Founding.Date[i],1,4))))*12
@@ -21,6 +29,7 @@ for (i in 1:length(Founding.Date)) {
 }
 fin_win["Month.dff"] <- datedff
 
+# Derive qqplot for each variables
 par(mfrow=c(2,3))
 qqnorm(Month.dff,ylab = "Month Difference");qqline(Month.dff,col=2)
 qqnorm(age,ylab = "Age");qqline(age,col=2)
@@ -28,6 +37,7 @@ qqnorm(Num.Founders,ylab = "Number of Founders");qqline(Num.Founders,col=2)
 qqnorm(Number.Investors,ylab = "Number of Investors");qqline(Number.Investors,col=2)
 qqnorm(Number.Funding.Rounds,ylab = "Number of Funding Rounds");qqline(Number.Funding.Rounds,col=2)
 
+# Eliminate outlier and make transformations
 fin_win <- fin_win[-55,]
 loginvestor <- log(Number.Investors)
 logfunding <- log(Number.Funding.Rounds)
@@ -61,7 +71,7 @@ ggplot(fin_win) +
   theme(plot.title = element_text(face = "bold")) +
   theme(legend.position = "bottom")
 
-
+# Establish logistic regression model
 winlogit <- glm(Winner ~ Graduate.Indicator + 
                   relevel(factor(Primary.Industry),ref = 'High Tech') + 
                   relevel(factor(Stateind),ref = 'N') + 
@@ -84,8 +94,7 @@ logLik(winlogit)
 write.csv(wholetable,"C:/Users/thinkpad/Desktop/BU/MassChallenge/regression/winlogitsum.csv")
 write.csv(anlogit,"C:/Users/thinkpad/Desktop/BU/MassChallenge/regression/anlogit.csv")
 # goodness of fit
-hl <- hoslem.test(winlogit$y,fitted(winlogit),g=10)
-hl
+(hl <- hoslem.test(winlogit$y,fitted(winlogit),g=10))
 # Concordance Paired
 bruteforce<-function(model){
   # Get all actual observations and their fitted values into a frame
@@ -141,57 +150,10 @@ predicted_values3<-ifelse(predict(winlogit,type="response")>threshold3,1,0)
 actual_values3<-winlogit$y
 conf_matrix3 <-table(predicted_values3,actual_values3)
 sensitivity(conf_matrix3);specificity(conf_matrix3)
-par(mfrow=c(1,3))
-interplot(winlogit, var1="age", var2="Graduate.Indicator",ci = 0.9, point = T,ercolor = "blue",esize = 1.5) +
-  geom_point(size=2,color="red") +
-  xlab("Graduate Indicator(1=Graduate, 0=Not Graduate)") +
-  ylab("Estimated Coeffecient of Age") +
-  ggtitle("Estimated Coeffecient of Age by Graduate Indicator") +
-  theme(plot.title = element_text(face = "bold"))
-
-interplot(winlogit, var1="Month.dff", var2="Graduate.Indicator",ci = 0.9,point = T,ercolor = "blue",esize = 1.5) +
-  geom_point(size=2,color="red") +
-  xlab("Graduate Indicator(1=Graduate, 0=Not Graduate)") +
-  ylab("Estimated Coeffecient \nof Month Difference") +
-  ggtitle("Estimated Coeffecient of Month Difference \nby Graduate Indicator") +
-  theme(plot.title = element_text(face = "bold"))
-
-interplot(winlogit, var1="Past.Experience", var2="Graduate.Indicator",ci = 0.9,point = T,ercolor = "blue",esize = 1.5) +
-  geom_point(size=2,color="red") +
-  xlab("Graduate Indicator(1=Graduate, 0=Not Graduate)") +
-  ylab("Estimated Coeffecient of Past Experience \n(1=have started a company before, 0=not)") +
-  ggtitle("Estimated Coeffecient of Past Experience \nby Graduate Indicator") +
-  theme(plot.title = element_text(face = "bold"))
-
-interplot(winlogit, var1="age", var2="Month.dff",ci=0.9) +
-  xlab("Month Difference") +
-  ylab("Estimated Coeffecient of Age \nby Month Difference") +
-  theme_bw() +
-  ggtitle("Estimated Coeffecient of Age \nby Month Difference") +
-  theme(plot.title = element_text(face = "bold")) +
-  geom_hline(yintercept = 0,linetype = "dashed")
-
-interplot(winlogit, var1="loginvestor", var2="logfunding",ci=0.9) +
-  xlab("log(Number of Funding Rounds)") +
-  ylab("Estimated Coeffecient of \nlog(Number of Investors)") +
-  theme_bw() +
-  ggtitle("Estimated Coeffecient of log(Number of Investors) \nby log(Number of Funding Rounds)") +
-  theme(plot.title = element_text(face = "bold")) +
-  geom_hline(yintercept = 1,linetype = "dashed")
 
 
-train <- fin_win[,c(5,14,15,17,18,19,21,24,25,26,27,28)][1:200,]
-test <- fin_win[,c(5,14,15,17,18,19,21,24,25,26,27,28)][201:247,]
 
-cl <- fin_win[,11][1:200]
-cltest <- fin_win[,11][201:247]
-knnresult <- knn(train,test,cl,k=5)
-ctr <- 0
-for (i in 1:47){
-  if (knnresult[i]==cltest[i]){
-    ctr <- ctr + 1
-  } else {ctr <- ctr}
-}
+# AUC
 auc.coords <- lroc(winlogit)$auc
 lroc(winlogit)+
   title("ROC Curve for Estimated Winners")
@@ -200,14 +162,3 @@ lroc(winlogit)+
 probabilities <- predict(winlogit, type = "response")
 predicted.classes <- ifelse(probabilities > 0.5, "pos", "neg")
 head(predicted.classes)
-# age
-age <- NULL
-for (i in 1:length(Date.of.Birth)) {
-  newage <- 2018 - as.numeric(unlist(strsplit(Date.of.Birth[i],"/"))[3])
-  age <- c(age,newage)
-}
-fin_win["age"] <- age
-write.csv(fin_win,"C:/Users/thinkpad/Desktop/BU/MassChallenge/regression/2016-2017model.csv")
-
-
-library(class)
